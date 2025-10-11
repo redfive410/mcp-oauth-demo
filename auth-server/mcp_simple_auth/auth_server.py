@@ -134,6 +134,13 @@ def create_authorization_server(server_settings: AuthServerSettings, auth_settin
         )
     )
 
+    # Add health check endpoint for Cloud Run
+    async def health_check_handler(request: Request) -> Response:
+        """Health check endpoint for Cloud Run and other platforms."""
+        return JSONResponse({"status": "healthy"})
+
+    routes.append(Route("/health", endpoint=health_check_handler, methods=["GET"]))
+
     return Starlette(routes=routes)
 
 
@@ -156,7 +163,9 @@ async def run_server(server_settings: AuthServerSettings, auth_settings: SimpleA
 
 @click.command()
 @click.option("--port", default=9000, help="Port to listen on")
-def main(port: int) -> int:
+@click.option("--host", default="localhost", help="Host to bind to")
+@click.option("--issuer-url", default=None, help="Public issuer URL (required for HTTPS)")
+def main(port: int, host: str, issuer_url: str | None) -> int:
     """
     Run the MCP Authorization Server.
 
@@ -164,19 +173,29 @@ def main(port: int) -> int:
 
     Uses simple hardcoded credentials for demo purposes.
     """
+    import os
+
     logging.basicConfig(level=logging.INFO)
+
+    # Allow Cloud Run to override port via PORT env var
+    port = int(os.environ.get("PORT", port))
+
+    # Get issuer URL from env var or CLI option
+    # For Cloud Run deployments, this should be the public HTTPS URL
+    issuer_url = os.environ.get("ISSUER_URL", issuer_url)
+    if not issuer_url:
+        # Default to local development URL
+        issuer_url = f"http://{host}:{port}"
 
     # Load simple auth settings
     auth_settings = SimpleAuthSettings()
 
     # Create server settings
-    host = "localhost"
-    server_url = f"http://{host}:{port}"
     server_settings = AuthServerSettings(
         host=host,
         port=port,
-        server_url=AnyHttpUrl(server_url),
-        auth_callback_path=f"{server_url}/login",
+        server_url=AnyHttpUrl(issuer_url),
+        auth_callback_path=f"{issuer_url}/login",
     )
 
     asyncio.run(run_server(server_settings, auth_settings))
