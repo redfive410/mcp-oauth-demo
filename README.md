@@ -30,7 +30,7 @@ cd auth-server
 ```
 # Run resource server using remote auth server
 
-uv run mcp-simple-auth-rs --port=8001 --auth-server=https://mcp-oauth-auth-server-uswest1-area51-954-dev-1.a.run.app  --transport=streamable-http --oauth-strict
+uv run mcp-simple-auth-rs --port=8001 --auth-server=https://mcp-oauth-auth-server-323998774564.us-west1.run.app  --transport=streamable-http --oauth-strict
 ```
 
 ```
