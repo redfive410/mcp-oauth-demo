@@ -106,7 +106,9 @@ def create_resource_server(settings: ResourceServerSettings) -> FastMCP:
 
 @click.command()
 @click.option("--port", default=8001, help="Port to listen on")
+@click.option("--host", default="localhost", help="Host to bind to")
 @click.option("--auth-server", default="http://localhost:9000", help="Authorization Server URL")
+@click.option("--server-url", default=None, help="Public server URL (required for HTTPS)")
 @click.option(
     "--transport",
     default="streamable-http",
@@ -118,7 +120,7 @@ def create_resource_server(settings: ResourceServerSettings) -> FastMCP:
     is_flag=True,
     help="Enable RFC 8707 resource validation",
 )
-def main(port: int, auth_server: str, transport: Literal["sse", "streamable-http"], oauth_strict: bool) -> int:
+def main(port: int, host: str, auth_server: str, server_url: str | None, transport: Literal["sse", "streamable-http"], oauth_strict: bool) -> int:
     """
     Run the MCP Resource Server.
 
@@ -129,15 +131,28 @@ def main(port: int, auth_server: str, transport: Literal["sse", "streamable-http
 
     Must be used with a running Authorization Server.
     """
+    import os
+
     logging.basicConfig(level=logging.INFO)
+
+    # Allow Cloud Run to override port via PORT env var
+    port = int(os.environ.get("PORT", port))
+
+    # Get server URL from env var or CLI option
+    # For Cloud Run deployments, this should be the public HTTPS URL
+    server_url = os.environ.get("MCP_RESOURCE_SERVER_URL", server_url)
+    if not server_url:
+        # Default to local development URL
+        server_url = f"http://{host}:{port}/mcp"
+
+    # Get auth server URL from env var or CLI option
+    auth_server = os.environ.get("MCP_RESOURCE_AUTH_SERVER_URL", auth_server)
 
     try:
         # Parse auth server URL
         auth_server_url = AnyHttpUrl(auth_server)
 
         # Create settings
-        host = "localhost"
-        server_url = f"http://{host}:{port}/mcp"
         settings = ResourceServerSettings(
             host=host,
             port=port,
