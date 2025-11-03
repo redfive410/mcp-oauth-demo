@@ -25,7 +25,8 @@ from uvicorn import Config, Server
 from mcp.server.auth.routes import cors_middleware, create_auth_routes
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 
-from .simple_auth_provider import SimpleAuthSettings, SimpleOAuthProvider
+from .firestore_auth_provider import FirestoreOAuthProvider
+from .simple_auth_provider import SimpleAuthSettings
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +41,14 @@ class AuthServerSettings(BaseModel):
     auth_callback_path: str = "http://localhost:9000/login/callback"
 
 
-class SimpleAuthProvider(SimpleOAuthProvider):
+class SimpleAuthProvider(FirestoreOAuthProvider):
     """
-    Authorization Server provider with simple demo authentication.
+    Authorization Server provider with Firestore persistence.
 
     This provider:
     1. Issues MCP tokens after simple credential authentication
-    2. Stores token state for introspection by Resource Servers
+    2. Stores token state in Firestore for persistence across restarts
+    3. Provides introspection endpoint for Resource Servers
     """
 
     def __init__(self, auth_settings: SimpleAuthSettings, auth_callback_path: str, server_url: str):
@@ -140,6 +142,19 @@ def create_authorization_server(server_settings: AuthServerSettings, auth_settin
         return JSONResponse({"status": "healthy"})
 
     routes.append(Route("/health", endpoint=health_check_handler, methods=["GET"]))
+
+    # Add cleanup endpoint for expired data (optional manual trigger)
+    async def cleanup_handler(request: Request) -> Response:
+        """Manually trigger cleanup of expired tokens and auth codes."""
+        results = await oauth_provider.cleanup_expired_data()
+        return JSONResponse(
+            {
+                "status": "success",
+                "cleaned_up": results,
+            }
+        )
+
+    routes.append(Route("/cleanup", endpoint=cleanup_handler, methods=["POST"]))
 
     return Starlette(routes=routes)
 

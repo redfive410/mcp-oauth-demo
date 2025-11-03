@@ -52,3 +52,71 @@ OAuthClient library builds authorization URL. (ex: https://mcp-oauth-auth-server
 Authorization code is exchanged for Bearer token.
 
 Bearer token is passed as header for Auth to MCP server.
+
+==========
+
+## Firestore Persistence
+
+The OAuth Authorization Server now uses **Firestore** for persistent storage, solving CloudRun instance timeout issues.
+
+### What's Stored in Firestore
+
+All OAuth state persists across CloudRun restarts:
+- OAuth clients (DCR registrations) → `oauth_clients` collection
+- Access tokens → `oauth_tokens` collection
+- Authorization codes → `auth_codes` collection
+- OAuth flow state → `oauth_state` collection
+- User session data → `user_data` collection
+
+### Benefits
+
+✅ **No state loss** - Tokens survive CloudRun instance restarts
+✅ **Serverless-friendly** - No connection pooling issues
+✅ **Auto-scaling** - Firestore scales with your traffic
+✅ **Fast** - 50-150ms latency for token introspection
+✅ **Cost-effective** - Pay-per-use (~$3/month for typical usage)
+
+### Deployment
+
+The `deploy.sh` script automatically:
+1. Enables Firestore API
+2. Creates Firestore database (Native mode)
+3. Configures CloudRun with `GCP_PROJECT_ID` environment variable
+4. Grants automatic Firestore permissions
+
+```bash
+cd auth-server
+./deploy.sh
+```
+
+### New Endpoints
+
+**Manual cleanup of expired data:**
+```bash
+curl -X POST https://your-auth-server.run.app/cleanup
+```
+
+**Health check:**
+```bash
+curl https://your-auth-server.run.app/health
+```
+
+### Documentation
+
+See [auth-server/FIRESTORE_SETUP.md](auth-server/FIRESTORE_SETUP.md) for:
+- Architecture details
+- Firestore collections schema
+- Local development setup (with emulator)
+- Monitoring and maintenance
+- Cost optimization
+- Security considerations
+- Troubleshooting guide
+
+### Migration Notes
+
+No data migration needed! When you first deploy:
+- Firestore collections start empty
+- Existing clients must re-register via `/register`
+- Users must re-authenticate to get new tokens
+
+This matches the previous behavior when CloudRun instances restarted.

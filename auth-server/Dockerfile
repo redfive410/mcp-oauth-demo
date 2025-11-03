@@ -19,4 +19,5 @@ EXPOSE 9000
 
 # Run the MCP auth server
 # Cloud Run will set PORT env var, bind to 0.0.0.0 to accept external connections
-CMD ["uv", "run", "mcp-simple-auth-as", "--host", "0.0.0.0", "--port", "9000"]
+# Note: --port flag will default to 9000, but can be overridden by PORT env var in the Python code
+CMD ["uv", "run", "mcp-simple-auth-as", "--host", "0.0.0.0"]
