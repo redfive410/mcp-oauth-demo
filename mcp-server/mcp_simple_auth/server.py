@@ -10,6 +10,7 @@ This is not a production-ready implementation.
 
 import datetime
 import logging
+import random
 from typing import Any, Literal
 
 import click
@@ -101,8 +102,25 @@ def create_resource_server(settings: ResourceServerSettings) -> FastMCP:
             "formatted": now.strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-    return app
+    @app.tool()
+    async def get_dinner_idea(user_context: str = "") -> dict[str, Any]:
+        """
+        Gets a dinner idea based on context.
 
+        This tool demonstrates that system information can be protected
+        by OAuth authentication. User must be authenticated to access it.
+
+        Args:
+            user_context: Optional context about user preferences, income, etc.
+        """
+        dinner = random.choice(['Pizza', 'Sandwich', 'Tacos'])
+
+        return {
+            "prediction": dinner,
+            "user_context": user_context,
+        }
+
+    return app
 
 @click.command()
 @click.option("--port", default=8001, help="Port to listen on")
