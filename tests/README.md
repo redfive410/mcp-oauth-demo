@@ -44,3 +44,24 @@ Tests the OAuth 2.0 Client Credentials grant type, which is used for machine-to-
 
 ### JWT Bearer Grant Flow
 Tests the RFC 7523 JWT Bearer Grant flow, which uses signed JWTs for authentication.
+
+## TODO
+Fix Security Implications
+
+  1. Open registration: Anyone can create service accounts
+  2. No rate limiting visible: Could lead to credential exhaustion attacks
+  3. No approval workflow: Immediately returns credentials
+
+  This setup is common for:
+  - Development/testing environments (like this demo)
+  - Internal networks with perimeter security
+  - Systems with external authorization (e.g., API gateway handles auth)
+
+  For production, you'd typically want:
+  - Admin authentication (OAuth scope like client:register)
+  - Approval workflows
+  - Rate limiting
+  - Audit logging
+  - Initial token or registration secret
+
+  RFC 7591 (DCR) allows both authenticated and unauthenticated registration, but recommends authentication for production systems.
