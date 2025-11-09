@@ -64,12 +64,6 @@ curl -X POST http://localhost:9000/token/custom \
 
 # Response: {"access_token": "...", "token_type": "Bearer", ...}
 ```
-
-**Test script:**
-```bash
-python test_client_credentials.py
-```
-
 ---
 
 ## 3. JWT Bearer Grant (Cryptographic Service Authentication)
@@ -130,11 +124,6 @@ curl -X POST http://localhost:9000/token/custom \
   -d "scope=user"
 
 # Response: {"access_token": "...", "token_type": "Bearer", ...}
-```
-
-**Test script:**
-```bash
-python test_jwt_bearer.py
 ```
 
 ---
@@ -204,26 +193,6 @@ All OAuth state is persisted in Firestore:
 - `client_public_keys` - Public keys for JWT validation
 
 This allows the auth server to survive restarts and scale across multiple instances.
-
----
-
-## Running Tests
-
-1. **Start the auth server:**
-   ```bash
-   cd auth-server
-   uv run python -m mcp_simple_auth.auth_server
-   ```
-
-2. **Test client credentials flow:**
-   ```bash
-   python test_client_credentials.py
-   ```
-
-3. **Test JWT bearer flow:**
-   ```bash
-   python test_jwt_bearer.py
-   ```
 
 ---
 

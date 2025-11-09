@@ -27,6 +27,8 @@ Make sure the auth server is running before running these tests:
 
 ```bash
 # From the auth-server directory
+lsof -i :9000 #check if port is open
+
 cd ../auth-server
 uv run mcp-simple-auth-as --no-firestore
 ```
