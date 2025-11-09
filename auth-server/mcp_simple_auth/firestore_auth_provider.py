@@ -241,3 +241,96 @@ class FirestoreOAuthProvider(SimpleOAuthProvider):
             "tokens": tokens_cleaned,
             "auth_codes": codes_cleaned,
         }
+
+    # Client Credentials Flow - override to use Firestore
+    async def exchange_client_credentials(
+        self,
+        client: OAuthClientInformationFull,
+        scopes: list[str],
+    ) -> OAuthToken:
+        """
+        Exchange client credentials for access token using Firestore.
+
+        Args:
+            client: The OAuth client making the request
+            scopes: Requested scopes
+
+        Returns:
+            Access token for the service account
+        """
+        # Call parent implementation to generate token
+        token = await super().exchange_client_credentials(client, scopes)
+
+        # Token and user_data are already stored in parent's in-memory dicts
+        # Now persist them to Firestore
+        access_token = self.tokens[token.access_token]
+        token_data = access_token.model_dump(mode="json")
+        await self.firestore.set_token(token.access_token, token_data)
+
+        user_data = self.user_data[token.access_token]
+        await self.firestore.set_user_data(token.access_token, user_data)
+
+        logger.info(f"Stored client credentials token in Firestore for {client.client_id}")
+
+        return token
+
+    # JWT Bearer Grant - override to use Firestore for public key storage
+    async def register_client_public_key(self, client_id: str, public_key_pem: str) -> None:
+        """
+        Register a public key for a client in Firestore.
+
+        Args:
+            client_id: The client ID
+            public_key_pem: The public key in PEM format
+        """
+        # Store in parent's in-memory dict
+        await super().register_client_public_key(client_id, public_key_pem)
+
+        # Also persist to Firestore
+        await self.firestore.set_public_key(client_id, public_key_pem)
+        logger.info(f"Stored public key in Firestore for client {client_id}")
+
+    async def exchange_jwt_bearer(
+        self,
+        assertion: str,
+        scopes: list[str],
+    ) -> OAuthToken:
+        """
+        Exchange JWT Bearer assertion for access token using Firestore.
+
+        Args:
+            assertion: The JWT assertion signed by the client's private key
+            scopes: Requested scopes
+
+        Returns:
+            Access token for the service account
+        """
+        # First, load public key from Firestore if not in memory
+        import jwt as jwt_lib
+
+        # Decode without verification to get client_id
+        unverified_claims = jwt_lib.decode(assertion, options={"verify_signature": False})
+        client_id = unverified_claims.get("iss")
+
+        if client_id and client_id not in self.client_public_keys:
+            # Try to load from Firestore
+            public_key = await self.firestore.get_public_key(client_id)
+            if public_key:
+                self.client_public_keys[client_id] = public_key
+                logger.info(f"Loaded public key from Firestore for client {client_id}")
+
+        # Call parent implementation to validate JWT and generate token
+        token = await super().exchange_jwt_bearer(assertion, scopes)
+
+        # Token and user_data are already stored in parent's in-memory dicts
+        # Now persist them to Firestore
+        access_token = self.tokens[token.access_token]
+        token_data = access_token.model_dump(mode="json")
+        await self.firestore.set_token(token.access_token, token_data)
+
+        user_data = self.user_data[token.access_token]
+        await self.firestore.set_user_data(token.access_token, user_data)
+
+        logger.info(f"Stored JWT bearer token in Firestore for client {client_id}")
+
+        return token

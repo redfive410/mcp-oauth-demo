@@ -14,6 +14,7 @@ import secrets
 import time
 from typing import Any
 
+import jwt
 from pydantic import AnyHttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.exceptions import HTTPException
@@ -66,6 +67,8 @@ class SimpleOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
         self.state_mapping: dict[str, dict[str, str | None]] = {}
         # Store authenticated user information
         self.user_data: dict[str, dict[str, Any]] = {}
+        # Store client public keys for JWT Bearer Grant validation
+        self.client_public_keys: dict[str, str] = {}
 
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
         """Get OAuth client information."""
@@ -269,4 +272,167 @@ class SimpleOAuthProvider(OAuthAuthorizationServerProvider[AuthorizationCode, Re
         """Revoke a token."""
         if token in self.tokens:
             del self.tokens[token]
+
+    # Client Credentials Flow (RFC 6749 Section 4.4)
+    async def exchange_client_credentials(
+        self,
+        client: OAuthClientInformationFull,
+        scopes: list[str],
+    ) -> OAuthToken:
+        """
+        Exchange client credentials for access token.
+        Used for machine-to-machine authentication.
+
+        Args:
+            client: The OAuth client making the request
+            scopes: Requested scopes
+
+        Returns:
+            Access token for the service account
+        """
+        if not client.client_id:
+            raise ValueError("No client_id provided")
+
+        # Validate client has permission for requested scopes
+        client_scopes = set(client.scope.split()) if client.scope else set()
+        allowed_scopes = set(scopes) & client_scopes
+
+        if not allowed_scopes:
+            raise ValueError(f"Client not authorized for requested scopes: {scopes}")
+
+        # Generate service account token
+        service_token = f"mcp_service_{secrets.token_hex(32)}"
+
+        # Store token
+        self.tokens[service_token] = AccessToken(
+            token=service_token,
+            client_id=client.client_id,
+            scopes=list(allowed_scopes),
+            expires_at=int(time.time()) + 3600,  # 1 hour
+            resource=None,
+        )
+
+        # Store service account user data
+        self.user_data[service_token] = {
+            "client_id": client.client_id,
+            "user_id": f"service_account_{client.client_id}",
+            "authenticated_at": time.time(),
+            "auth_method": "client_credentials",
+        }
+
+        logger.info(f"Issued client credentials token for {client.client_id} with scopes {allowed_scopes}")
+
+        return OAuthToken(
+            access_token=service_token,
+            token_type="Bearer",
+            expires_in=3600,
+            scope=" ".join(allowed_scopes),
+        )
+
+    # JWT Bearer Grant (RFC 7523)
+    async def exchange_jwt_bearer(
+        self,
+        assertion: str,
+        scopes: list[str],
+    ) -> OAuthToken:
+        """
+        Exchange JWT Bearer assertion for access token.
+        Used for machine-to-machine authentication with asymmetric keys.
+
+        Args:
+            assertion: The JWT assertion signed by the client's private key
+            scopes: Requested scopes
+
+        Returns:
+            Access token for the service account
+        """
+        try:
+            # Decode JWT header to get the client_id (from 'iss' claim)
+            unverified_claims = jwt.decode(assertion, options={"verify_signature": False})
+            client_id = unverified_claims.get("iss")
+
+            if not client_id:
+                raise ValueError("JWT missing 'iss' (issuer) claim")
+
+            # Get client information
+            client = await self.get_client(client_id)
+            if not client:
+                raise ValueError(f"Unknown client: {client_id}")
+
+            # Get client's public key
+            public_key = self.client_public_keys.get(client_id)
+            if not public_key:
+                raise ValueError(f"No public key registered for client: {client_id}")
+
+            # Verify JWT signature and claims
+            # Normalize server_url (strip trailing slash) for audience comparison
+            normalized_server_url = self.server_url.rstrip("/")
+            claims = jwt.decode(
+                assertion,
+                public_key,
+                algorithms=["RS256", "ES256"],
+                audience=normalized_server_url,
+                options={
+                    "require": ["iss", "sub", "aud", "exp"],
+                },
+            )
+
+            # Validate claims
+            if claims["iss"] != client_id:
+                raise ValueError("JWT 'iss' claim doesn't match client_id")
+
+            if claims["sub"] != client_id:
+                raise ValueError("JWT 'sub' claim doesn't match client_id")
+
+            # Validate client has permission for requested scopes
+            client_scopes = set(client.scope.split()) if client.scope else set()
+            allowed_scopes = set(scopes) & client_scopes
+
+            if not allowed_scopes:
+                raise ValueError(f"Client not authorized for requested scopes: {scopes}")
+
+            # Generate service account token
+            service_token = f"mcp_jwt_{secrets.token_hex(32)}"
+
+            # Store token
+            self.tokens[service_token] = AccessToken(
+                token=service_token,
+                client_id=client.client_id,
+                scopes=list(allowed_scopes),
+                expires_at=int(time.time()) + 3600,  # 1 hour
+                resource=None,
+            )
+
+            # Store service account user data
+            self.user_data[service_token] = {
+                "client_id": client.client_id,
+                "user_id": f"service_account_{client.client_id}",
+                "authenticated_at": time.time(),
+                "auth_method": "jwt_bearer",
+            }
+
+            logger.info(f"Issued JWT bearer token for {client.client_id} with scopes {allowed_scopes}")
+
+            return OAuthToken(
+                access_token=service_token,
+                token_type="Bearer",
+                expires_in=3600,
+                scope=" ".join(allowed_scopes),
+            )
+
+        except jwt.ExpiredSignatureError:
+            raise ValueError("JWT has expired")
+        except jwt.InvalidTokenError as e:
+            raise ValueError(f"Invalid JWT: {e}")
+
+    async def register_client_public_key(self, client_id: str, public_key_pem: str) -> None:
+        """
+        Register a public key for a client (for JWT Bearer Grant validation).
+
+        Args:
+            client_id: The client ID
+            public_key_pem: The public key in PEM format
+        """
+        self.client_public_keys[client_id] = public_key_pem
+        logger.info(f"Registered public key for client {client_id}")
 

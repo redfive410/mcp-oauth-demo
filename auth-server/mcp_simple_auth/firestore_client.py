@@ -10,6 +10,7 @@ Collections:
 - auth_codes: Authorization codes
 - oauth_state: OAuth flow state mapping
 - user_data: User session data
+- client_public_keys: Public keys for JWT Bearer Grant validation
 """
 
 import logging
@@ -39,6 +40,7 @@ class FirestoreClient:
         self.auth_codes = self.db.collection("auth_codes")
         self.oauth_state = self.db.collection("oauth_state")
         self.user_data = self.db.collection("user_data")
+        self.public_keys = self.db.collection("client_public_keys")
 
     # Client operations
     async def get_client(self, client_id: str) -> dict[str, Any] | None:
@@ -121,6 +123,19 @@ class FirestoreClient:
     async def set_user_data(self, key: str, data: dict[str, Any]) -> None:
         """Store user data."""
         self.user_data.document(key).set(data)
+
+    # Client public key operations (for JWT Bearer Grant)
+    async def get_public_key(self, client_id: str) -> str | None:
+        """Get client's public key for JWT validation."""
+        doc = self.public_keys.document(client_id).get()
+        if not doc.exists:
+            return None
+        data = doc.to_dict()
+        return data.get("public_key") if data else None
+
+    async def set_public_key(self, client_id: str, public_key_pem: str) -> None:
+        """Store client's public key for JWT validation."""
+        self.public_keys.document(client_id).set({"public_key": public_key_pem})
 
     # Cleanup operations
     async def cleanup_expired_tokens(self) -> int:
