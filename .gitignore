@@ -1,3 +1,8 @@
 .venv
 uv.lock
 __pycache__
+
+# Test key files (JWT Bearer Grant tests)
+test_private_key.pem
+test_public_key.pem
+*.pem
