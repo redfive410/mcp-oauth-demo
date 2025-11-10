@@ -35,6 +35,13 @@ uv run mcp-simple-auth-as --no-firestore
 
 The `--no-firestore` flag uses in-memory storage instead of Firestore, which is suitable for local testing.
 
+```bash
+#if running with firestore, then run this first
+gcloud auth application-default login
+
+uv run mcp-simple-auth-as
+```
+
 Optionally, you can also run the resource server on port 8001 to test the full flow with protected resources.
 
 ## Test Flows
