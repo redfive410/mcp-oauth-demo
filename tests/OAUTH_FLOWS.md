@@ -114,10 +114,6 @@ curl -X POST http://localhost:9000/register_public_key \
     "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
   }'
 
-curl -X POST http://localhost:9000/register_public_key \
-  -H "Content-Type: application/json" \
-  -d '{"client_id": "c7Sy90jWdgr50ROKKxjNTw", "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnogskWyYD1gztZM2qAmfaVx4g+NnvTr47VL+/I+wdaFDl5lhJ0qLaUz4d9jAqm1w56FUMvk4yQB8sY75ZeOjKLfySWQupgttH0TgKTL8GH2zE8eiNl3cv6EMoK7M35ooDsnVbmncogA7sPHXwGoNTbOBsmIc3M+zGkWUcg50icAIOat+NwR0SG2l1HMVboiHl0swWlNR38e5BorbDEzdmnmfMffbrm9Mw6JsD8aFGF9+dKUMM1no0IPbUvMTKh7kZyGqzWcIu1gW1btn/+q+wV03/zDLSx8so/U7d+nKu4GemAScDGnhiWGrgfhFFg4t6+GykB/pDmvzXWoB8ZwNzQIDAQAB\n-----END PUBLIC KEY-----"}'
-
 # 4. Create JWT assertion (using Python/libraries)
 # See test_jwt_bearer.py for full example
 
