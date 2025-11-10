@@ -108,6 +108,7 @@ async def test_jwt_bearer_flow():
 
     # Sign JWT with private key
     assertion = jwt.encode(claims, private_pem, algorithm="RS256")
+    print(assertion)
 
     print(f"✅ JWT assertion created:")
     print(f"   Token: {assertion[:50]}...")

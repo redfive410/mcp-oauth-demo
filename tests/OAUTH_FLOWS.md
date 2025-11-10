@@ -38,22 +38,22 @@ This MCP OAuth demo now supports **three OAuth 2.0 grant types** for different u
 **Security:** Uses shared secret (like password for services)
 
 **Endpoints:**
-- `POST /register` - Register service account client
+- `POST /register/service_account` - Register service account client
 - `POST /token/custom` - Exchange credentials for token
 
 **Example:**
 ```bash
 # 1. Register service account
-curl -X POST http://localhost:9000/register \
+curl -X POST http://localhost:9000/register/service_account \
   -H "Content-Type: application/json" \
   -d '{
     "client_name": "My Service Account",
     "grant_types": ["client_credentials"],
-    "scope": "user",
-    "token_endpoint_auth_method": "client_secret_post"
+    "scope": "user"
   }'
 
-# Response: {"client_id": "...", "client_secret": "..."}
+# Response: {"client_id": "...", "client_secret": "...", "grant_types": [...], "scope": "user"}
+# Note: token_endpoint_auth_method is automatically set to "client_secret_post"
 
 # 2. Get access token
 curl -X POST http://localhost:9000/token/custom \
@@ -84,7 +84,7 @@ curl -X POST http://localhost:9000/token/custom \
 - Industry standard for cloud platforms
 
 **Endpoints:**
-- `POST /register` - Register service account client
+- `POST /register/service_account` - Register service account client
 - `POST /register_public_key` - Upload public key
 - `POST /token/custom` - Exchange JWT for token
 
@@ -95,16 +95,16 @@ openssl genrsa -out private_key.pem 2048
 openssl rsa -in private_key.pem -pubout -out public_key.pem
 
 # 2. Register service account
-curl -X POST http://localhost:9000/register \
+curl -X POST http://localhost:9000/register/service_account \
   -H "Content-Type: application/json" \
   -d '{
     "client_name": "My JWT Service Account",
     "grant_types": ["urn:ietf:params:oauth:grant-type:jwt-bearer"],
-    "scope": "user",
-    "token_endpoint_auth_method": "private_key_jwt"
+    "scope": "user"
   }'
 
-# Response: {"client_id": "..."}
+# Response: {"client_id": "...", "client_name": "...", "grant_types": [...], "scope": "user"}
+# Note: token_endpoint_auth_method is automatically set to "none" (auth via JWT assertion)
 
 # 3. Register public key
 curl -X POST http://localhost:9000/register_public_key \
@@ -113,6 +113,10 @@ curl -X POST http://localhost:9000/register_public_key \
     "client_id": "YOUR_CLIENT_ID",
     "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
   }'
+
+curl -X POST http://localhost:9000/register_public_key \
+  -H "Content-Type: application/json" \
+  -d '{"client_id": "c7Sy90jWdgr50ROKKxjNTw", "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnogskWyYD1gztZM2qAmfaVx4g+NnvTr47VL+/I+wdaFDl5lhJ0qLaUz4d9jAqm1w56FUMvk4yQB8sY75ZeOjKLfySWQupgttH0TgKTL8GH2zE8eiNl3cv6EMoK7M35ooDsnVbmncogA7sPHXwGoNTbOBsmIc3M+zGkWUcg50icAIOat+NwR0SG2l1HMVboiHl0swWlNR38e5BorbDEzdmnmfMffbrm9Mw6JsD8aFGF9+dKUMM1no0IPbUvMTKh7kZyGqzWcIu1gW1btn/+q+wV03/zDLSx8so/U7d+nKu4GemAScDGnhiWGrgfhFFg4t6+GykB/pDmvzXWoB8ZwNzQIDAQAB\n-----END PUBLIC KEY-----"}'
 
 # 4. Create JWT assertion (using Python/libraries)
 # See test_jwt_bearer.py for full example
